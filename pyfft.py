@@ -2,9 +2,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import fftpack
 
-# Return the value in Hz for each FFT bin
-def fft_bin_hz(num, fs, size):
-    return (num * fs / size)
 
 f1 = 13.33                               # Frequency, in cycles per second, or Hertz
 f2 = 40.00
