@@ -4,39 +4,45 @@ from scipy import fftpack
 from scipy.signal import butter, lfilter, freqz
 
 # This function estimates the center frequency based on the energy level
-# of the 1st and 2nd order FFT peaks
+# of the highest energy peak and its neighbour
+# It is importante to notice that if a 1st order harmonic has an energy level
+# higher than 50% of the fundamental frequency, this algorithm will wrongly point
+# to the harmonic frequency. You can use this to find unexpected frequencies,
+# higher than what you are expecting to measure.
+#
 # Args: fft     ->  Original calculated FFT
 #       bins    ->  The frequency bins
+
 def find_center_frequency(fft, bins):
     fft_peaks_value = []
     fft_peaks_index = []
     fft_half_len = int(len(fft) / 2)
     fft_buf = fft[0:fft_half_len].copy()
 
-    # Find first and second highest energy levels
-    # and their corresponding indexes
-    for i in range(2):
-        fft_peaks_index.append(np.abs(fft_buf).argmax())
-        index = fft_peaks_index[i]
-        fft_peaks_value.append(np.abs(fft_buf[index]))
-        # Clear to find next highest energy level
-        fft_buf[index] = 0
+    # Get highest energy peak
+    fft_peaks_index.append(np.abs(fft_buf).argmax())
+    index = fft_peaks_index[0]
+    fft_peaks_value.append(np.abs(fft_buf[index]))
+    # Get higher neighbour
+    if (np.abs(fft_buf[index - 1]) > np.abs(fft_buf[index + 1])):
+        fft_peaks_index.append(index - 1)
+    else:
+        fft_peaks_index.append(index + 1)
+    index = fft_peaks_index[1]
+    fft_peaks_value.append(np.abs(fft_buf[index]))
 
     # Estimate the center frequency based on energy levels
     # First off, sum the energy levels
     energy_sum = fft_peaks_value[0] + fft_peaks_value[1]
     # Then find the energy factor of the highest peak
     e_factor = fft_peaks_value[0] / energy_sum
-    # Now we must subtract highest and 2nd highest value
+    # Now we must subtract highest and its neighbour
     # corresponding frequency to find a delta
     delta_f = bins[fft_peaks_index[0]] - bins[fft_peaks_index[1]]
     # We can now estimate the frequency using the following formula:
-    # f_est = (delta_f * e_factor) + second_highest_energy_level
+    # f_est = (delta_f * e_factor) + neighbour_energy_level
     f_est = (delta_f * e_factor) + bins[fft_peaks_index[1]]
     return f_est
-
-
-
 
 def remove_dc_offset(signal):
 
@@ -55,18 +61,18 @@ def butter_lowpass_filter(data, cutoff, fs, order=5):
     y = lfilter(b, a, data)
     return y
 
-fx = 20.00                                  # Frequency, in cycles per second, or Hertz
-fy = 13.33
+fx = 19.66                                  # Frequency, in cycles per second, or Hertz
+fy = 20
 fz = 0
-n_samples = 128                             # Number of collected samples
-sampling_time = 0.020                       # Sampling time in seconds
+n_samples = 512                             # Number of collected samples
+sampling_time = 0.02                        # Sampling time in seconds
 sampling_rate = 1 / sampling_time           # Sampling rate, or number of measurements per second (in Hz)
 window = np.hanning(n_samples + 1)[:-1]     # Hanning window
 
 t = np.linspace(0, n_samples * sampling_time, n_samples, endpoint=False)
 #x = (300 * np.sin(2 * np.pi * fx * t + 2)) + (0 * np.sin(2 * np.pi * fx * t * 22 + 2))
 #y = (400 * np.sin(2 * np.pi * fy * t)) + (0 * np.sin(2 * np.pi * fy * t * 10))
-x = (50 * np.sin(2 * np.pi * fx * t))# + (15 * np.sin(2 * np.pi * fx * 25 * t))
+x = (50 * np.sin(2 * np.pi * fx * t)) + (20 * np.sin(2 * np.pi * fx * 20 * t))
 y = (20 * np.sin(2 * np.pi * fy * t + (np.pi)))# + (9 * np.sin(2 * np.pi * fy * 25 * t + (np.pi)))
 #z = 100 * np.sin(2 * np.pi * fz * t)
 
@@ -137,7 +143,7 @@ X_tmp = X.copy()
 Y_tmp = Y.copy()
 
 # Define size of the partial FFT
-partial_fft_size = 16
+partial_fft_size = 128
 X_max_value = []
 X_max_index = []
 Y_max_value = []
